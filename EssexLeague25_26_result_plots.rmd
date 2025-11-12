@@ -38,6 +38,8 @@ breaks <- seq(as.numeric(as_hms("00:25:00")),
 
 # Essex League Cross Country 2025-2026
 
+[Essex XC League](https://essexxcleague.org/)
+
 ## Overview of results for each event
 
 ### Results by category
