@@ -1,0 +1,292 @@
+---
+title: "EL_XC_res"
+author: "Jason_Wray"
+date: "2025-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(patchwork)
+library(plotly)
+library(hms)
+library(pals)
+library(tidyverse)
+```
+
+```{r, include=FALSE, warning=FALSE}
+load(file="results/processed/results.RData")
+```
+
+```{r, include=FALSE}
+
+club_colours <- read_csv("club_info/club_colours.csv")
+club_colours$club[34] <- "Hockley Trail Runners"
+
+col_palette <- list(
+  Cat = setNames(pals::warmcool(n = length(levels(res$MenHainault$Cat))), levels(res$MenHainault$Cat)), 
+  club_colour = setNames(club_colours$colour, club_colours$club),
+  club_fill = setNames(club_colours$fill, club_colours$club)
+)
+
+breaks <- seq(as.numeric(as_hms("00:25:00")),
+             as.numeric(as_hms("01:05:00")),
+             300)
+
+```
+
+# Essex League Cross Country 2025-2026
+
+## Overview of results for each event
+
+### Results by category
+
+```{r, echo=FALSE, warning=FALSE}
+p <- list()
+
+for(race in names(res)){
+  
+  p[[race]] <- res[[race]] %>%
+    ggplot(aes(Cat, Time))+
+    geom_boxplot()+
+    geom_jitter(aes(colour = Club, fill=Club, 
+                   text=paste0(Name, 
+                               ", Club: ", Club,
+                               ", Cat: ", Cat,
+                             ", position: ", Pos,
+                             ", Time: ", Time)))+
+    scale_colour_manual(values = col_palette$club_colour)+
+    scale_fill_manual(values = col_palette$club_fill)+
+    scale_y_reverse(labels = function(x) as_hms(x),
+                    breaks=breaks)+
+    labs(x = "Category", y="Time", title = gsub("Men", "", race))+
+    theme_classic()+
+    theme(legend.position = "none",
+          panel.background = element_rect(fill = 'slategrey'))
+  
+}
+
+ggplotly(p$MenOneTreeHill)
+ggplotly(p$MenHainault)
+```
+
+### Results, individuals
+
+```{r, echo=FALSE, warning=FALSE}
+p <- list()
+
+for(race in names(res)){
+  
+  p[[race]] <- res[[race]] %>%
+    ggplot(aes(Pos, Time))+
+    geom_point(aes(colour = Club, fill=Club, 
+                   text=paste0(Name, 
+                               ", Club: ", Club,
+                               ", Cat: ", Cat,
+                             ", position: ", Pos,
+                             ", Time: ", Time)))+
+    scale_colour_manual(values = col_palette$club_colour)+
+    scale_fill_manual(values = col_palette$club_fill)+
+    scale_y_reverse(labels = function(x) as_hms(x),
+                    breaks=breaks)+
+    labs(x = "Position", y="Time", title = gsub("Men", "", race))+
+    theme_classic()+
+    theme(legend.position = "none",
+          panel.background = element_rect(fill = 'slategrey'))
+  }
+
+ggplotly(p$MenOneTreeHill)
+ggplotly(p$MenHainault)
+
+```
+
+### Results by club
+
+Clubs are ordered by their team position for senior men. First 6 to score for divisions 1 and 2, 4 for division 3.
+
+```{r, echo=FALSE, warning=FALSE}
+p <- list()
+
+for(race in names(res_sm)){
+  
+  p[[race]] <- res_sm[[race]] %>%
+    ggplot(aes(Club, Time, colour = Club, fill=Club))+
+    geom_boxplot()+
+    geom_point(aes(text=paste0(Name, 
+                               ", Club: ", Club,
+                               ", Cat: ", Cat,
+                             ", position: ", Pos,
+                             ", Time: ", Time)))+
+    scale_colour_manual(values = col_palette$club_colour)+
+    scale_fill_manual(values = col_palette$club_fill)+
+    scale_y_reverse(labels = function(x) as_hms(x),
+                    breaks=breaks)+
+    facet_grid(.~sm_division, scales="free_x", space="free")+
+    labs(x = "", y="Time", title = gsub("Men", "", race))+
+    theme_classic()+
+    theme(legend.position = "none",
+          axis.text.x = element_text(angle=45, hjust=1),
+          panel.background = element_rect(fill = 'slategrey'))
+  }
+
+ggplotly(p$MenOneTreeHill)
+ggplotly(p$MenHainault)
+
+```
+
+### Senior Men team results
+
+Clubs are ordered by their team position for senior men. First 6 to score for divisions 1 and 2, 4 for division 3.
+
+Total team score is shown in the top row, individual scores below with scorers highlighted.
+
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
+p <- list()
+
+for(race in names(sm_team_res)){
+
+  p1 <- 
+  ggplot(sm_team_res[[race]], 
+         aes(Club, score, 
+             text = paste0(Club, ", team position: ", Team_Pos, 
+                           ", Team score: ", score, 
+                           ", # runners: ", n_runners)))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~sm_division, scales="free_x")+
+  labs(x = "", y="Team score", title = paste0(gsub("Men", "", race), ", Senior Men"), subtitle = "By division")+
+  theme_classic()+
+  theme(axis.text.x = element_blank(), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+p2 <- 
+  ggplot(res_sm[[race]], 
+             aes(Club, Pos, 
+                 text=paste0(Name, ", Cat: ", Cat,
+                             ", position: ", Pos,
+                             ", Time: ", Time)))+
+  geom_point(aes(colour = Club, fill = Club, alpha = Scorer_alpha), shape=21, size=2)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~sm_division, scales="free_x")+
+  labs(x = "", y="Individual positions")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'), strip.text=element_blank())
+
+# Convert ggplot objects to plotly objects using ggplotly()
+fig1 <- ggplotly(p1, tooltip = "text")
+fig2 <- ggplotly(p2, tooltip = "text")
+
+p[[race]] <- subplot(fig1, fig2, nrows = 2, titleY = TRUE, heights = c(0.4, 0.6))
+}
+
+p$MenOneTreeHill
+p$MenHainault
+```
+
+### Vet Men team results
+
+Clubs are ordered by their team position for veteran men (V40 and above). First 4 to score.
+
+Total team score is shown in the top row, individual scores below with scorers highlighted.
+
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
+for(race in names(vet_team_res)){
+  
+p1 <- 
+  ggplot(vet_team_res[[race]], 
+         aes(Club, score, text = paste0(Club, ", Team position: ", Team_Pos, ", Team score: ", score)))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~Full_Team, scales="free_x", space="free")+
+  labs(x = "", y = "Team score", title = paste0(gsub("Men", "", race), ", Vets"))+
+  theme_classic()+
+  theme(axis.text.x = element_blank(), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+p2 <- 
+  ggplot(res_vet[[race]], 
+             aes(Club, Pos, text=paste0(Name, ", Cat: ", Cat,
+                             ", Time: ", Time,
+                             ", Position: ", Pos, 
+                             ", Vet position: ", Vet_Pos)))+
+  geom_point(aes(colour = Club, fill = Club, alpha = Scorer_alpha), shape=21, size=2)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~Full_Team, scales="free_x", space="free")+
+  labs(x = "", y="Overall position")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'), 
+        strip.text = element_blank())
+
+# Convert ggplot objects to plotly objects using ggplotly()
+fig1 <- ggplotly(p1, tooltip = "text")
+fig2 <- ggplotly(p2, tooltip = "text")
+
+p[[race]] <- subplot(fig1, fig2, nrows = 2, titleY = TRUE, heights = c(0.4, 0.6))
+}
+
+p$MenOneTreeHill
+p$MenHainault
+```
+
+```{r, include=FALSE, fig.dim = c(8, 8)}
+for(race in names(vet_team_res)){
+  
+p1 <- 
+  ggplot(vet_team_res[[race]], 
+         aes(Club, score, text = paste0(Club, ", Team position: ", Team_Pos, ", Team score: ", score)))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~Full_Team, scales="free_x", space="free")+
+  labs(x = "", y = "Team score", title = paste0(gsub("Men", "", race), ", Vets"))+
+  theme_classic()+
+  theme(axis.text.x = element_blank(), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+p2 <- 
+  ggplot(res_vet[[race]], 
+             aes(Club, Time, text=paste0(Name, ", Cat: ", Cat,
+                             ", Time: ", Time,
+                             ", Position: ", Pos, 
+                             ", Vet position: ", Vet_Pos)))+
+  geom_point(aes(colour = Club, fill = Club, alpha = Scorer_alpha), shape=21, size=2)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse(labels = function(x) as_hms(x),
+                  breaks=breaks)+
+  facet_grid(.~Full_Team, scales="free_x", space="free")+
+  labs(x = "", y="Time")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'), 
+        strip.text = element_blank())
+
+# Convert ggplot objects to plotly objects using ggplotly()
+fig1 <- ggplotly(p1, tooltip = "text")
+fig2 <- ggplotly(p2, tooltip = "text")
+
+p[[race]] <- subplot(fig1, fig2, nrows = 2, titleY = TRUE, heights = c(0.4, 0.6))
+}
+
+p$MenOneTreeHill
+p$MenHainault
+```
+

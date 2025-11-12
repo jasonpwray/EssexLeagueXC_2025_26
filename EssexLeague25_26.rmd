@@ -1,0 +1,451 @@
+---
+title: "EssexLeagueXC"
+author: "Jason_Wray"
+date: "2025-11-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(stringdist)
+library(hms)
+library(tidyverse)
+```
+
+```{r}
+res.files <- list.files(path = "results/", pattern = "csv", full.names = TRUE)
+
+res <- lapply(res.files, read_csv)
+names(res) <- gsub(".csv", "", basename(res.files))
+
+for(i in seq_along(res)){
+  colnames(res[[i]])[1] <- "Pos"
+}
+
+res <- lapply(res, function(x){
+  x %>% 
+    filter(!grepl("Non Scorer", Club)) %>%
+    mutate(
+      Cat = factor(Cat, levels = c("U20", "SM", paste0("V", (8:15)*5))),
+      Time = as_hms(paste0("00:", gsub(":00$", "", Time))))
+})
+
+res$MenOneTreeHill$Time[res$MenOneTreeHill$Name=="Vincent Monk"] <- as_hms("01:02:00")
+```
+
+```{r}
+club_names <- data.frame(
+  Club = c(unique(res$MenHainault$Club), "Hockley Trail Runners")) %>%
+  mutate(short = gsub(" AC| Athletics Club| Athletic Club| RC| Running Club| Runners", "", Club))
+
+for(race in names(res)){
+  matched_indices <- amatch(res[[race]]$Club, club_names$short, method = "lcs", maxDist = 20)
+  res[[race]]$Club <- club_names$Club[matched_indices]
+}
+
+```
+
+```{r}
+sm_div <- read_csv("club_info/club_sm_division.csv")
+sm_div$sm_division <- paste0("Div", sm_div$sm_division)
+
+res <- lapply(res, function(x){
+  x %>% 
+    left_join(sm_div, 
+              by = join_by(Club == club)) %>%
+    mutate(Vet = grepl("^V", Cat))
+})
+```
+
+```{r}
+sm_team_res <- list()
+
+for(race in names(res)){
+  
+  div1_2 <- res[[race]] %>%
+    filter(sm_division != "Div3", !is.na(sm_division)) %>%
+    group_by(sm_division, Club) %>%
+    slice_min(Pos, n=6) %>%
+    summarise(
+      n_runners = n(),
+      score = sum(Pos)) %>%
+    ungroup() %>%
+    mutate(Full_Team = factor(
+             ifelse(n_runners >= 6, "Full Team", "< 6 Runners"),
+             levels = c("Full Team", "< 6 Runners"))) %>%
+    arrange(sm_division, desc(n_runners), score) %>%
+    group_by(sm_division) %>%
+    mutate(Team_Pos = 1:n())
+
+  div3 <- res[[race]] %>%
+    filter(sm_division == "Div3", !is.na(sm_division)) %>%
+    group_by(sm_division, Club) %>%
+    slice_min(Pos, n=4) %>%
+    summarise(
+      n_runners = n(),
+      score = sum(Pos)) %>%
+    ungroup() %>%
+    mutate(Full_Team = factor(
+             ifelse(n_runners >= 4, "Full Team", "< 4 Runners"),
+             levels = c("Full Team", "< 4 Runners"))) %>%
+    arrange(sm_division, desc(n_runners), score) %>%
+    group_by(sm_division) %>%
+    mutate(Team_Pos = 1:n())
+  
+  sm_team_res[[race]] <- bind_rows(div1_2, div3)
+  
+  sm_team_res[[race]]$Club <- factor(sm_team_res[[race]]$Club, levels = sm_team_res[[race]]$Club)
+}
+
+###
+sm_team_res
+```
+
+```{r}
+res_sm <- list()
+
+for(race in names(res)){
+  
+  div1_2 <- res[[race]] %>%
+    filter(sm_division != "Div3", !is.na(sm_division)) %>%
+    arrange(sm_division, Pos) %>%
+    group_by(sm_division, Club) %>%
+    mutate(
+      n_runners=n(),
+      Team_Pos = 1:n(), 
+      Team_Scorer = ifelse(Team_Pos <= 6, "yes", "no"),
+      Scorer_alpha = ifelse(Team_Scorer == "yes", 1, 0.5)) %>%
+    ungroup() %>%
+    mutate(Full_Team = factor(
+             ifelse(n_runners >= 6, "Full Team", "< 6 Runners"),
+             levels = c("Full Team", "< 4 Runners"))) %>%
+    arrange(sm_division, Pos)
+
+  div3 <- res[[race]] %>%
+    filter(sm_division == "Div3", !is.na(sm_division)) %>%
+    arrange(sm_division, Pos) %>%
+    group_by(sm_division, Club) %>%
+    mutate(
+      n_runners=n(),
+      Team_Pos = 1:n(), 
+      Team_Scorer = ifelse(Team_Pos <= 4, "yes", "no"),
+      Scorer_alpha = ifelse(Team_Scorer == "yes", 1, 0.5)) %>%
+    ungroup() %>%
+    mutate(Full_Team = factor(
+             ifelse(n_runners >= 4, "Full Team", "< 4 Runners"),
+             levels = c("Full Team", "< 4 Runners"))) %>%
+    arrange(sm_division, Pos)
+  
+  res_sm[[race]] <- bind_rows(div1_2, div3)
+  
+  res_sm[[race]]$Club <- factor(res_sm[[race]]$Club, levels = levels(sm_team_res[[race]]$Club))
+}
+
+res_sm
+```
+
+```{r}
+vet_team_res <- list()
+
+for(race in names(res)){
+  
+  vet_team_res[[race]] <- res[[race]] %>%
+    filter(Vet) %>%
+    group_by(Club) %>%
+    slice_min(Pos, n=4) %>%
+    summarise(
+      n_runners = n(),
+      score = sum(Pos)) %>%
+    ungroup() %>%
+    arrange(desc(n_runners), score) %>%
+    mutate(Team_Pos = 1:nrow(.),
+           Club = fct_reorder(Club, Team_Pos),
+           Full_Team = factor(
+             ifelse(n_runners >= 4, "Full Team", "< 4 Runners"),
+             levels = c("Full Team", "< 4 Runners")))
+}
+
+vet_team_res
+```
+
+```{r}
+res_vet <- list()
+
+for(race in names(res)){
+  
+  res_vet[[race]] <- res[[race]] %>% 
+    filter(Vet) %>%
+    arrange(Pos) %>%
+    mutate(Vet_Pos = 1:nrow(.), 
+           Club = factor(Club, levels = levels(vet_team_res[[race]]$Club))) %>%
+    group_by(Club) %>%
+    mutate(
+      n_runners=n(),
+      Vet_Team_Pos=1:n(),
+      Vet_Scorer=ifelse(Vet_Team_Pos <= 4, "yes", "no"),
+      Scorer_alpha = ifelse(Vet_Scorer == "yes", 1, 0.5),
+      Full_Team = factor(
+             ifelse(n_runners >= 4, "Full Team", "< 4 Runners"),
+             levels = c("Full Team", "< 4 Runners"))) %>%
+    mutate(score=Pos)%>%
+    ungroup()
+}
+
+res_vet
+```
+
+```{r}
+library(pals)
+
+club_colours <- read_csv("club_info/club_colours.csv")
+
+col_palette <- list(
+  Cat = setNames(pals::warmcool(n = length(levels(res$MenHainault$Cat))), levels(res$MenHainault$Cat)), 
+  club_colour = setNames(club_colours$colour, club_colours$club),
+  club_fill = setNames(club_colours$fill, club_colours$club),
+  Vet_Scorer = setNames(c("white", "black"), c("no", "yes")),
+  Team_Scorer = setNames(c("white", "black"), c("no", "yes"))
+)
+
+```
+
+```{r}
+ggplot(res$MenHainault, aes(Pos, Time, colour = Cat))+
+  geom_point(shape=21)+
+  scale_colour_manual(values = col_palette$Cat)+
+  theme_bw()
+
+ggplot(res$MenHainault, aes(Pos, Time, colour = Club, fill = Club))+
+  geom_point(shape=21)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  theme_bw()
+
+ggplot(res$MenHainault, aes(Cat, Time, fill = Cat))+
+  geom_boxplot()+
+  scale_fill_manual(values = col_palette$Cat)+
+  theme_bw()
+
+ggplot(res$MenHainault, aes(fct_reorder(Club, Pos), Time, fill = Club, colour=Club))+
+  geom_boxplot()+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+ggplot(res$MenHainault, aes(fct_reorder(Club, Pos), Pos, fill = Club, colour=Club))+
+  geom_boxplot()+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_y_reverse()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+ggplot(res$MenHainault %>% filter(Vet) %>% group_by(Club) %>% slice_min(Pos, n=4) %>% mutate(n=n()) %>% filter(n==4), 
+       aes(fct_reorder(Club, Pos), Pos, fill = Club, colour=Club))+
+  geom_boxplot()+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_y_reverse()+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+
+for(cat in levels(res$MenHainault$Cat)){
+  df <- res$MenHainault %>%
+    filter(Cat==cat)
+  
+  print(
+    ggplot(df, aes(fct_reorder(Club, Pos), Pos, fill = Club, colour=Club))+
+      geom_boxplot()+
+      scale_fill_manual(values = col_palette$club_fill)+
+      scale_colour_manual(values = col_palette$club_colour)+
+      scale_y_reverse()+
+      labs(x="", y="Position", title = cat)+
+      theme_classic()+
+      theme(axis.text.x = element_text(angle=45, hjust=1), 
+            legend.position = "none",
+            panel.background = element_rect(fill = 'slategrey'))  
+    )
+}
+```
+
+```{r}
+library(ggrepel)
+
+ggplot(vet_team_res$MenHainault, 
+       aes(Club, score))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  geom_point(data = res_vet$MenHainault, 
+             aes(Club, score, colour = Vet_Scorer), 
+             shape=21) +
+  scale_colour_manual(values = c(col_palette$club_colour, col_palette$Vet_Scorer))+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~Full_Team, scales="free_x", space="free")+
+  labs(x = "", title = "Vets")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+```
+
+```{r}
+library(plotly)
+p <- 
+  ggplot(vet_team_res$MenHainault, 
+         aes(Club, score, text = Club))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  geom_point(data = res_vet$MenHainault, 
+             aes(Club, score, text=Name, colour = Vet_Scorer), 
+             shape=21) +
+  scale_colour_manual(values = c(col_palette$club_colour, col_palette$Vet_Scorer))+
+  scale_fill_manual(values = col_palette$club_fill)+
+  labs(x = "", title = "Vets")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+ggplotly(p)
+```
+
+```{r}
+library(patchwork)
+p1 <- 
+  ggplot(vet_team_res$MenHainault, 
+         aes(Club, score, text = Club))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  labs(x = "", title = "Vets")+
+  facet_grid(.~Full_Team, scales="free_x", space="free")+
+  theme_classic()+
+  theme(axis.text.x = element_blank(), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+p2 <- 
+  ggplot(res_vet$MenHainault, 
+             aes(Club, Pos, text=paste0(Name, ", Vet position: ", Vet_Pos)))+
+  geom_point(aes(colour = Club, fill = Club, alpha = Scorer_alpha), shape=21, size=2)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  labs(x = "", y="Overall position")+
+  facet_grid(.~Full_Team, scales="free_x", space="free")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'),
+        strip.text = element_blank())
+
+# Convert ggplot objects to plotly objects using ggplotly()
+fig1 <- ggplotly(p1)
+fig2 <- ggplotly(p2)
+
+# Combine the plotly objects into a single figure
+# To stack vertically (2 rows):
+subplot(fig1, fig2, nrows = 2, shareX = TRUE, titleY = TRUE)
+```
+
+```{r}
+p1 <- 
+  ggplot(sm_team_res$MenHainault, 
+         aes(Club, score, text = Club))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~sm_division, scales="free_x")+
+  labs(x = "", title = "Senior Men")+
+  theme_classic()+
+  theme(axis.text.x = element_blank(), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+p2 <- 
+  ggplot(res_sm$MenHainault, 
+             aes(Club, Pos, text=paste0(Name, ", position: ", Pos)))+
+  geom_point(aes(colour = Club, fill = Club, alpha=Scorer_alpha), shape=21, size=2)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~sm_division, scales="free_x")+
+  labs(x = "", y="Overall position")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'), 
+        strip.text = element_blank())
+
+# Convert ggplot objects to plotly objects using ggplotly()
+fig1 <- ggplotly(p1)
+fig2 <- ggplotly(p2)
+
+# Combine the plotly objects into a single figure
+# To stack vertically (2 rows):
+subplot(fig1, fig2, nrows = 2, titleY = TRUE)
+
+fig1
+fig2
+```
+
+```{r}
+p1 <- 
+  ggplot(sm_team_res$MenHainault, 
+         aes(Club, score, text = Club))+
+  geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse()+
+  facet_grid(.~sm_division, scales="free_x", space="free")+
+  labs(x = "", title = "Senior Men")+
+  theme_classic()+
+  theme(axis.text.x = element_blank(), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'))
+
+p2 <- 
+  ggplot(res_sm$MenHainault, 
+             aes(Club, Time, text=paste0(Name, ", position: ", Pos)))+
+  geom_point(aes(colour = Club, fill = Club, alpha=Scorer_alpha), shape=21, size=2)+
+  scale_colour_manual(values = col_palette$club_colour)+
+  scale_fill_manual(values = col_palette$club_fill)+
+  scale_y_reverse(labels = function(x) as_hms(x))+
+  facet_grid(.~sm_division, scales="free_x", space="free")+
+  labs(x = "", y="Time")+
+  theme_classic()+
+  theme(axis.text.x = element_text(angle=45, hjust=1), 
+        legend.position = "none",
+        panel.background = element_rect(fill = 'slategrey'), 
+        strip.text = element_blank())
+
+# Convert ggplot objects to plotly objects using ggplotly()
+fig1 <- ggplotly(p1)
+fig2 <- ggplotly(p2)
+
+# Combine the plotly objects into a single figure
+# To stack vertically (2 rows):
+subplot(fig1, fig2, nrows = 2, titleY = TRUE)
+```
+
+```{r}
+saveRDS(res, "results/processed/Men_Results.rds")
+saveRDS(sm_team_res, "results/processed/SM_team_results.rds")
+saveRDS(vet_team_res, "results/processed/Vet_team_results.rds")
+saveRDS(res_sm, "results/processed/SM_Results.rds")
+saveRDS(res_vet, "results/processed/Vet_Results.rds")
+
+save(list = ls(pattern = "res"), file="results/processed/results.RData")
+```
+
