@@ -12,6 +12,7 @@ library(patchwork)
 library(plotly)
 library(hms)
 library(pals)
+library(DT)
 library(tidyverse)
 ```
 
@@ -40,7 +41,50 @@ breaks <- seq(as.numeric(as_hms("00:25:00")),
 
 [Essex XC League](https://essexxcleague.org/)
 
+# Table of Contents
+1. [Overview of results for each event]
+2. [Senior Men, Team Results]
+3. [Veteran Men, Team Results]
+
+
 ## Overview of results for each event
+
+### Table of One Tree Hill results
+
+
+```{r, echo=FALSE}
+datatable(res_sm$MenOneTreeHill %>%
+            select(Position = Pos, 
+                   Name,
+                   Cat, 
+                   Club, 
+                   Time, 
+                   Division = sm_division, 
+                   `Team Position` = Team_Pos,
+                   `Team Scorer` = Team_Scorer
+                   ), 
+          rownames = FALSE, filter = "top"
+          )
+```
+
+
+### Table of Hainault results
+
+
+```{r, echo=FALSE}
+datatable(res_sm$MenHainault %>%
+            select(Position = Pos, 
+                   Name,
+                   Cat, 
+                   Club, 
+                   Time, 
+                   Division = sm_division, 
+                   `Team Position` = Team_Pos,
+                   `Team Scorer` = Team_Scorer
+                   ), 
+          rownames = FALSE, filter = "top")
+```
+
 
 ### Results by category
 
@@ -68,10 +112,20 @@ for(race in names(res)){
           panel.background = element_rect(fill = 'slategrey'))
   
 }
-
-ggplotly(p$MenOneTreeHill)
-ggplotly(p$MenHainault)
 ```
+
+#### One Tree Hill
+
+```{r, echo=FALSE, warning=FALSE}
+ggplotly(p$MenOneTreeHill, tooltip = "text")
+```
+
+#### Hainault
+
+```{r, echo=FALSE, warning=FALSE}
+ggplotly(p$MenHainault, tooltip = "text")
+```
+
 
 ### Results, individuals
 
@@ -97,11 +151,21 @@ for(race in names(res)){
     theme(legend.position = "none",
           panel.background = element_rect(fill = 'slategrey'))
   }
+```
 
-ggplotly(p$MenOneTreeHill)
-ggplotly(p$MenHainault)
+#### One Tree Hill
+
+```{r, echo=FALSE, warning=FALSE}
+ggplotly(p$MenOneTreeHill, tooltip = "text")
+```
+
+#### Hainault
+
+```{r, echo=FALSE, warning=FALSE}
+ggplotly(p$MenHainault, tooltip = "text")
 
 ```
+
 
 ### Results by club
 
@@ -131,19 +195,24 @@ for(race in names(res_sm)){
           axis.text.x = element_text(angle=45, hjust=1),
           panel.background = element_rect(fill = 'slategrey'))
   }
-
-ggplotly(p$MenOneTreeHill)
-ggplotly(p$MenHainault)
-
 ```
 
-### Senior Men team results
+#### One Tree Hill
 
-Clubs are ordered by their team position for senior men. First 6 to score for divisions 1 and 2, 4 for division 3.
+```{r, echo=FALSE, warning=FALSE}
+ggplotly(p$MenOneTreeHill, tooltip = "text")
+```
 
-Total team score is shown in the top row, individual scores below with scorers highlighted.
+#### Hainault
 
-```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
+```{r, echo=FALSE, warning=FALSE}
+ggplotly(p$MenHainault, tooltip = "text")
+```
+
+## Senior Men, Team Results
+
+```{r, echo=FALSE, warning=FALSE}
+# Create list of plots 
 p <- list()
 
 for(race in names(sm_team_res)){
@@ -188,18 +257,66 @@ fig2 <- ggplotly(p2, tooltip = "text")
 
 p[[race]] <- subplot(fig1, fig2, nrows = 2, titleY = TRUE, heights = c(0.4, 0.6))
 }
-
-p$MenOneTreeHill
-p$MenHainault
 ```
 
-### Vet Men team results
+### One Tree Hill
 
-Clubs are ordered by their team position for veteran men (V40 and above). First 4 to score.
+#### Table of Results
+
+
+```{r, echo=FALSE}
+datatable(sm_team_res$MenOneTreeHill %>%
+            select(Division = sm_division,
+                   `Team Position` = Team_Pos,
+                   Club,
+                   `Team Score` = score,
+                   `Full Team` = Full_Team
+                   ),
+          rownames = FALSE, filter = "top")
+```
+
+#### Plot of Results
+
+Clubs are ordered by their team position for senior men. First 6 to score for divisions 1 and 2, 4 for division 3.
 
 Total team score is shown in the top row, individual scores below with scorers highlighted.
 
+
 ```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
+p$MenOneTreeHill
+```
+
+### Hainault
+
+#### Table of Results
+
+
+```{r, echo=FALSE}
+datatable(sm_team_res$MenHainault %>%
+            select(Division = sm_division,
+                   `Team Position` = Team_Pos,
+                   Club,
+                   `Team Score` = score,
+                   `Full Team` = Full_Team
+                   ),
+          rownames = FALSE, filter = "top")
+```
+
+#### Plot of results
+
+Clubs are ordered by their team position for senior men. First 6 to score for divisions 1 and 2, 4 for division 3.
+
+Total team score is shown in the top row, individual scores below with scorers highlighted.
+
+
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
+p$MenHainault
+```
+
+## Veteran Men, Team Results
+
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
+p <- list()
 for(race in names(vet_team_res)){
   
 p1 <- 
@@ -240,8 +357,57 @@ fig2 <- ggplotly(p2, tooltip = "text")
 
 p[[race]] <- subplot(fig1, fig2, nrows = 2, titleY = TRUE, heights = c(0.4, 0.6))
 }
+```
 
+### One Tree Hill
+
+#### Table of Results
+
+
+```{r, echo=FALSE}
+datatable(vet_team_res$MenOneTreeHill %>%
+            select(`Team Position` = Team_Pos,
+                   Club,
+                   `Team Score` = score,
+                   `Full Team` = Full_Team
+                   ),
+          rownames = FALSE, filter = "top")
+```
+
+#### Plot of Results
+
+Clubs are ordered by their team position for veteran men (V40 and above). First 4 to score.
+
+Total team score is shown in the top row, individual scores below with scorers highlighted.
+
+
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
 p$MenOneTreeHill
+```
+
+### Hainault
+
+#### Table of Results
+
+
+```{r, echo=FALSE}
+datatable(vet_team_res$MenHainault %>%
+            select(`Team Position` = Team_Pos,
+                   Club,
+                   `Team Score` = score,
+                   `Full Team` = Full_Team
+                   ),
+          rownames = FALSE, filter = "top")
+```
+
+#### Plot of Results
+
+Clubs are ordered by their team position for veteran men (V40 and above). First 4 to score.
+
+Total team score is shown in the top row, individual scores below with scorers highlighted.
+
+
+```{r, echo=FALSE, warning=FALSE, fig.dim = c(8, 8)}
 p$MenHainault
 ```
 
