@@ -222,7 +222,8 @@ for(race in names(sm_team_res)){
          aes(Club, score, 
              text = paste0(Club, ", team position: ", Team_Pos, 
                            ", Team score: ", score, 
-                           ", # runners: ", n_runners)))+
+                           ", # runners: ", n_runners, 
+                           ", Scorers: ", scorers)))+
   geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
   scale_colour_manual(values = col_palette$club_colour)+
   scale_fill_manual(values = col_palette$club_fill)+

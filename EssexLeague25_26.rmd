@@ -69,7 +69,8 @@ for(race in names(res)){
     slice_min(Pos, n=6) %>%
     summarise(
       n_runners = n(),
-      score = sum(Pos)) %>%
+      score = sum(Pos), 
+      scorers = paste(Name, collapse = ", ")) %>%
     ungroup() %>%
     mutate(Full_Team = factor(
              ifelse(n_runners >= 6, "Full Team", "< 6 Runners"),
@@ -84,7 +85,8 @@ for(race in names(res)){
     slice_min(Pos, n=4) %>%
     summarise(
       n_runners = n(),
-      score = sum(Pos)) %>%
+      score = sum(Pos), 
+      scorers = paste(Name, collapse = ", ")) %>%
     ungroup() %>%
     mutate(Full_Team = factor(
              ifelse(n_runners >= 4, "Full Team", "< 4 Runners"),
@@ -156,7 +158,8 @@ for(race in names(res)){
     slice_min(Pos, n=4) %>%
     summarise(
       n_runners = n(),
-      score = sum(Pos)) %>%
+      score = sum(Pos), 
+      scorers = paste(Name, collapse = ", ")) %>%
     ungroup() %>%
     arrange(desc(n_runners), score) %>%
     mutate(Team_Pos = 1:nrow(.),
@@ -322,7 +325,10 @@ ggplotly(p)
 library(patchwork)
 p1 <- 
   ggplot(vet_team_res$MenHainault, 
-         aes(Club, score, text = Club))+
+         aes(Club, score, 
+             text = paste0(
+               Club, 
+               ", Scorers: ", scorers)))+
   geom_point(aes(colour = Club, fill = Club), shape=21, size=3)+
   scale_colour_manual(values = col_palette$club_colour)+
   scale_fill_manual(values = col_palette$club_fill)+
@@ -350,12 +356,14 @@ p2 <-
         strip.text = element_blank())
 
 # Convert ggplot objects to plotly objects using ggplotly()
-fig1 <- ggplotly(p1)
-fig2 <- ggplotly(p2)
+fig1 <- ggplotly(p1, tooltip = "text")
+fig2 <- ggplotly(p2, tooltip = "text")
 
 # Combine the plotly objects into a single figure
 # To stack vertically (2 rows):
 subplot(fig1, fig2, nrows = 2, shareX = TRUE, titleY = TRUE)
+
+p1
 ```
 
 ```{r}
